@@ -1,0 +1,46 @@
+cabal-version:      3.4
+name:               davinci-convert
+version:            0.1.0.0
+synopsis:           Web-Service that uses ffmpeg to make video files compatible with Davinci Resolve
+description:        Davinci Resolve only accepts certain video formats in its free version.
+                    While it is perfectly fine to do this conversions in most cases, I want
+                    to have a very plain and simple way for my students to convert their
+                    recordings without having to deal a lot with those formats.
+                    This is a simple warp/wai application, that uses raw byte strings and the
+                    process library.
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Markus Mayr
+maintainer:         markus.mayr@outlook.com
+-- copyright:
+category:           Web
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+
+executable davinci-convert
+    import:           warnings
+    main-is:          Main.hs
+    ghc-options: -threaded
+    -- other-modules:
+    -- other-extensions:
+    build-depends:    base ^>=4.18.2.1
+                    , blaze-html
+                    , bytestring
+                    , containers
+                    , directory
+                    , http-types
+                    , optparse-applicative
+                    , process
+                    , stm
+                    , temporary
+                    , text
+                    , wai
+                    , wai-extra
+                    , warp
+                    , word8
+    hs-source-dirs:   app
+    default-language: GHC2021
