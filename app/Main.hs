@@ -23,6 +23,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Options.Applicative as O
 import Data.Char8 (isAlphaNum)
+import Control.Exception (SomeException, try)
 
 type Queue = STM.TVar [FilePath]
 type ProgressSet = STM.TVar (S.Set FilePath)
@@ -46,14 +47,13 @@ bootstrapPage title inner = H.docTypeHtml $ do
         H.h1 title
         inner
 
--- HTML form for file upload
 uploadForm :: T.Text -> BL.ByteString
 uploadForm bp = H.renderHtml $ bootstrapPage "Upload video" $ do
   H.form
     H.! HA.action (H.textValue $ bp `T.append` "/upload")
     H.! HA.method "post"
     H.! HA.enctype "multipart/form-data" $ do
-      H.label "Scene:"
+      H.label "Szene:"
       H.select
         H.! HA.name "scene"
         H.! HA.class_ "form-select" $ do
@@ -81,13 +81,13 @@ uploadForm bp = H.renderHtml $ bootstrapPage "Upload video" $ do
         H.! HA.max "99"
         H.! HA.class_ "form-control"
       H.br
-      H.label "Camera:"
+      H.label "Kamera:"
       H.input
         H.! HA.type_ "text"
         H.! HA.name "camera"
         H.! HA.class_ "form-control"
       H.br
-      H.label "Select a video file:"
+      H.label "Videodatei:"
       H.input
         H.! HA.type_ "file"
         H.! HA.name "file"
@@ -101,26 +101,28 @@ uploadForm bp = H.renderHtml $ bootstrapPage "Upload video" $ do
 
 uploadResponse :: T.Text -> BL.ByteString
 uploadResponse bp = H.renderHtml $ bootstrapPage "Upload successful" $ do
-  H.p "File uploaded successfully"
-  H.p "Your video will be converted shortly."
+  H.p "Datei erfolgreich hochgeladen."
+  H.p "Das Video wird in Kürze konvertiert. Das kann ein bisschen dauern."
   H.p $ do
-    "It will appear at "
-    H.a "output" H.! HA.href (H.textValue "/converted")
+    "Es taucht dann unter "
+    H.a "/converted/" H.! HA.href (H.textValue "/converted/")
+    " auf."
   H.p $ do
-    "You can check the queue at "
-    H.a "queue" H.! HA.href (H.textValue $ bp `T.append` "/queue")
+    "Die Warteschlange findest du unter "
+    H.a "hier" H.! HA.href (H.textValue $ bp `T.append` "/queue")
+    "."
   H.p $ do
-    H.a "Upload another video" H.! HA.href (H.textValue bp)
+    H.a "Weiteres Video hochladen" H.! HA.href (H.textValue bp)
 
 queueResponse :: T.Text -> [FilePath] -> [FilePath] -> BL.ByteString
 queueResponse bp qs ps = H.renderHtml $ bootstrapPage "Queue" $ do
-  H.h2 "In progress"
+  H.h2 "In Verarbeitung"
   mapM_ (H.p . H.toHtml) ps
-  H.h2 "Pending"
+  H.h2 "In der Warteschlange"
   mapM_ (H.p . H.toHtml) qs
+  H.h2 "Weiteres Video hochladen"
   H.p $ do
-    "You can upload another video "
-    H.a "here" H.! HA.href (H.textValue bp)
+    H.a "Weiteres Video hochladen" H.! HA.href (H.textValue bp)
 
 -- Main application
 app :: FilePath -> [T.Text] -> Queue -> ProgressSet -> Application
@@ -179,9 +181,10 @@ worker fileBase' ffmpegPath' pending inProgress = forever $ do
   let inputFileName = fileBase' ++ "/uploads/" ++ f
   let outputFileName = fileBase' ++ "/tmp/" ++ f ++ ".mov"
   let ffmpegArgs = ["-i", inputFileName, "-c:v", "dnxhd", "-vf", "scale=1920:1080", "-b:v", "120M", "-c:a", "pcm_s16le", "-f", "mov", "-y", outputFileName]
-  (_, _, _, ph) <- createProcess (proc ffmpegPath' ffmpegArgs)
-  _ <- waitForProcess ph
-  renamePath (fileBase' ++ "/tmp/" ++ f ++ ".mov") (fileBase' ++ "/converted/" ++ f ++ ".mov")
+  _ <- try @SomeException $ do
+    (_, _, _, ph) <- createProcess (proc ffmpegPath' ffmpegArgs)
+    _ <- waitForProcess ph
+    renamePath (fileBase' ++ "/tmp/" ++ f ++ ".mov") (fileBase' ++ "/converted/" ++ f ++ ".mov")
   putStrLn $ "Done converting " ++ f
 
   STM.atomically $ STM.modifyTVar inProgress (S.delete f)
@@ -224,7 +227,6 @@ configParser = Config
      <> O.showDefault
       )
   
--- Run the server on port 3000
 main :: IO ()
 main = do
   config <- O.execParser $ O.info (configParser O.<**> O.helper)
