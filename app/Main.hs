@@ -32,6 +32,11 @@ bootstrapPage :: H.Html -> H.Html -> H.Html
 bootstrapPage title inner = H.docTypeHtml $ do
   H.head $ do
     H.title title
+    H.meta
+      H.! HA.charset "utf-8"
+    H.meta
+      H.! HA.name "viewport"
+      H.! HA.content "width=device-width, initial-scale=1"
     H.link
       H.! HA.rel "stylesheet"
       H.! HA.type_ "text/css"
@@ -46,6 +51,27 @@ bootstrapPage title inner = H.docTypeHtml $ do
       $ do
         H.h1 title
         inner
+
+mainPage :: BL.ByteString
+mainPage = H.renderHtml $ bootstrapPage "Davinci Convert" $ do
+  H.p $ do
+    "Um Videos hochzuladen und für Davinci vorzubereiten, gehe auf "
+    H.a
+      H.! HA.href "/convert"
+      $ "/convert"
+    "."
+  H.p $ do
+    "Hochgeladene Videos stehen unter "
+    H.a
+      H.! HA.href "/converted/"
+      $ "/converted/"
+    "zur Verfügung."
+  H.p $ do
+    "Die Windows-Version von Davinci Resolve kannst du "
+    H.a
+      H.! HA.href "/tmp/Davinci_Resolve_19.1.3_Windows.zip"
+      $ "hier"
+    " herunterladen."
 
 uploadForm :: T.Text -> BL.ByteString
 uploadForm bp = H.renderHtml $ bootstrapPage "Upload video" $ do
@@ -131,8 +157,8 @@ app fileBase' basePath pending inProgress req respond
                                           $ uploadForm bp
   | p == basePath ++ ["upload"] = handleUpload fileBase' bp pending req respond
   | p == basePath ++ ["queue"]  = handleQueue bp pending inProgress req respond
-  | otherwise                   = respond $ responseLBS status400 [("Content-Type", "text/plain")]
-                                            "Not Found"
+  | otherwise                   = respond $ responseLBS status400 [("Content-Type", "text/html")]
+                                            mainPage
   where p = pathInfo req
         bp = T.concat $ map ("/" `T.append`) basePath
 
@@ -226,7 +252,7 @@ configParser = Config
      <> O.value 3000
      <> O.showDefault
       )
-  
+
 main :: IO ()
 main = do
   config <- O.execParser $ O.info (configParser O.<**> O.helper)

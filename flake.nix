@@ -103,16 +103,6 @@
           services.nginx = lib.mkIf config.services.davinci-convert.nginx.enable {
             enable = true;
             virtualHosts.${config.services.davinci-convert.nginx.host} = {
-              locations.${config.services.davinci-convert.basePath} = {
-                proxyPass = "http://127.0.0.1:${toString config.services.davinci-convert.port}${config.services.davinci-convert.basePath}";
-                proxyWebsockets = true;
-		extraConfig = ''
-                  client_max_body_size 3G;  # Allow large file uploads (adjust as needed)
-                  client_body_timeout 180s; # Timeout for reading the client request body
-                  proxy_read_timeout 180s;  # Timeout for reading a response from the proxied server
-                  proxy_send_timeout 180s;  # Timeout for sending a request to the proxied server
-                '';
-              };
               locations."/uploads/" = {
                 alias = "${config.services.davinci-convert.fileBase}/uploads/";
 		extraConfig = ''
@@ -130,6 +120,16 @@
 		extraConfig = ''
 		  autoindex on;
 		'';
+              };
+              locations."/" = {
+                proxyPass = "http://127.0.0.1:${toString config.services.davinci-convert.port}";
+                proxyWebsockets = true;
+		extraConfig = ''
+                  client_max_body_size 3G;  # Allow large file uploads (adjust as needed)
+                  client_body_timeout 180s; # Timeout for reading the client request body
+                  proxy_read_timeout 180s;  # Timeout for reading a response from the proxied server
+                  proxy_send_timeout 180s;  # Timeout for sending a request to the proxied server
+                '';
               };
             };
           };
