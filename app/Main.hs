@@ -73,31 +73,30 @@ mainPage = H.renderHtml $ bootstrapPage "Davinci Convert" $ do
       $ "hier"
     " herunterladen."
 
-uploadForm :: T.Text -> BL.ByteString
-uploadForm bp = H.renderHtml $ bootstrapPage "Upload video" $ do
+mkGroupOption :: Int -> T.Text -> H.Html
+mkGroupOption value label =
+  H.option
+    H.! HA.value (H.stringValue $ show value)
+    $ H.text $ "Gruppe " <> (T.pack $ show value) <> ": " <> label
+
+uploadForm :: [T.Text] -> T.Text -> BL.ByteString
+uploadForm groups bp = H.renderHtml $ bootstrapPage "Upload video" $ do
   H.form
     H.! HA.action (H.textValue $ bp `T.append` "/upload")
     H.! HA.method "post"
     H.! HA.enctype "multipart/form-data" $ do
-      H.label "Szene:"
+      H.label "Gruppe:"
       H.select
+        H.! HA.name "group"
+        H.! HA.class_ "form-select" $ (mconcat $ zipWith mkGroupOption [1 ..] groups)
+      H.br
+      H.label "Szene:"
+      H.input
+        H.! HA.type_ "number"
         H.! HA.name "scene"
-        H.! HA.class_ "form-select" $ do
-          H.option
-            H.! HA.value "1"
-            $ "Gruppe 1"
-          H.option
-            H.! HA.value "2"
-            $ "Gruppe 2"
-          H.option
-            H.! HA.value "3"
-            $ "Gruppe 3"
-          H.option
-            H.! HA.value "4"
-            $ "Gruppe 4"
-          H.option
-            H.! HA.value "5"
-            $ "Gruppe 5"
+        H.! HA.min "1"
+        H.! HA.max "99"
+        H.! HA.class_ "form-control"
       H.br
       H.label "Take:"
       H.input
@@ -151,10 +150,10 @@ queueResponse bp qs ps = H.renderHtml $ bootstrapPage "Queue" $ do
     H.a "Weiteres Video hochladen" H.! HA.href (H.textValue bp)
 
 -- Main application
-app :: FilePath -> [T.Text] -> Queue -> ProgressSet -> Application
-app fileBase' basePath pending inProgress req respond
+app :: [T.Text] -> FilePath -> [T.Text] -> Queue -> ProgressSet -> Application
+app groups fileBase' basePath pending inProgress req respond
   | p == basePath               = respond $ responseLBS status200 [("Content-Type", "text/html")]
-                                          $ uploadForm bp
+                                          $ uploadForm groups bp
   | p == basePath ++ ["upload"] = handleUpload fileBase' bp pending req respond
   | p == basePath ++ ["queue"]  = handleQueue bp pending inProgress req respond
   | otherwise                   = respond $ responseLBS status400 [("Content-Type", "text/html")]
@@ -166,10 +165,11 @@ app fileBase' basePath pending inProgress req respond
 handleUpload :: FilePath -> T.Text -> Queue -> Application
 handleUpload fileBase' bp q req respond = do
   (params, files) <- parseRequestBody lbsBackEnd req
+  let pGroup = max 0 $ maybe 0 fst (lookup "group" params >>= readInt)
   let pScene = max 0 $ maybe 0 fst (lookup "scene" params >>= readInt)
   let pTake = max 0 $ maybe 0 fst (lookup "take" params >>= readInt)
   let pCamera = sanitizeCam $ fromMaybe "Unknown" (lookup "camera" params)
-  let fileName = digits 3 pScene <> "_" <> digits 2 pTake <> "_" <> pCamera
+  let fileName = digits 2 pGroup <> "_" <> digits 3 pScene <> "_" <> digits 2 pTake <> "_" <> pCamera
                  where digits n x = B8.pack $ replicate (n - length (show x)) '0' ++ show x
 
   case lookup "file" files of
@@ -220,6 +220,7 @@ data Config = Config
   , fileBase :: !FilePath
   , ffmpegPath :: !FilePath
   , port :: !Int
+  , groups :: ![T.Text]
   }
 
 configParser :: O.Parser Config
@@ -252,6 +253,13 @@ configParser = Config
      <> O.value 3000
      <> O.showDefault
       )
+  <*> O.many
+      ( O.strOption
+          ( O.long "group"
+            <> O.metavar "GROUPS..."
+            <> O.help "Provide a list of groups"
+          )
+      )
 
 main :: IO ()
 main = do
@@ -268,4 +276,4 @@ main = do
   queue <- STM.newTVarIO []
   inProgress <- STM.newTVarIO S.empty
   _ <- forkIO $ worker (fileBase config) (ffmpegPath config) queue inProgress
-  run (port config) (app (fileBase config) basePath' queue inProgress)
+  run (port config) (app (groups config) (fileBase config) basePath' queue inProgress)

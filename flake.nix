@@ -62,6 +62,11 @@
             default = "/var/lib/davinci-convert";
             description = "Base directory for uploads, tmp, and converted files";
           };
+	  groups = lib.mkOption {
+	    type = lib.types.listOf lib.types.str;
+	    default = [ "A" "B" "C" "D" "E" ];
+	    description = "Groups selectable from the Web UI";
+	  };
           nginx = {
             enable = lib.mkEnableOption "Enable Nginx reverse proxy";
             host = lib.mkOption {
@@ -79,7 +84,7 @@
             wantedBy = [ "multi-user.target" ];
             after = [ "network.target" ];
             serviceConfig = {
-              ExecStart = "${flake.packages."davinci-convert:exe:davinci-convert"}/bin/davinci-convert --ffmpeg-path ${config.services.davinci-convert.ffmpegPath} --port ${toString config.services.davinci-convert.port} --base-path ${config.services.davinci-convert.basePath} --file-base ${config.services.davinci-convert.fileBase}";
+              ExecStart = "${flake.packages."davinci-convert:exe:davinci-convert"}/bin/davinci-convert --ffmpeg-path ${config.services.davinci-convert.ffmpegPath} --port ${toString config.services.davinci-convert.port} --base-path ${config.services.davinci-convert.basePath} --file-base ${config.services.davinci-convert.fileBase} ${lib.concatStringsSep " " (map (x: "--group '${x}'") config.services.davinci-convert.groups)}";
               Restart = "always";
               User = "davinci-convert";
               Group = "davinci-convert";
