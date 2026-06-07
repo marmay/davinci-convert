@@ -12,7 +12,7 @@
           davinci-convert-project =
             final.haskell-nix.project' {
               src = ./.;
-              compiler-nix-name = "ghc966";
+              compiler-nix-name = "ghc910";
               # This is used by `nix develop .` to open a shell for use with
               # `cabal`, `hlint` and `haskell-language-server`
               shell.tools = {
@@ -20,15 +20,12 @@
                 hlint = {};
                 haskell-language-server = {};
               };
-              # Non-Haskell shell tools go here
               shell.buildInputs = with pkgs; [
                 nixpkgs-fmt
               ];
               shell.nativeBuildInputs = with pkgs; [
                 ffmpeg
               ];
-              # This adds `js-unknown-ghcjs-cabal` to the shell.
-              # shell.crossPlatforms = p: [p.ghcjs];
             };
         })
       ];
